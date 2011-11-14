@@ -361,7 +361,7 @@ class TestContainer(Base):
     set_up = False
 
     def testContainerNameLimit(self):
-        limit = 256
+        limit = 255
 
         for l in (limit-100, limit-10, limit-1, limit,
             limit+1, limit+10, limit+100):
