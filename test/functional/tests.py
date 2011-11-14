@@ -31,6 +31,7 @@ import urllib
 from test import get_config
 from swift import Account, AuthenticationFailed, Connection, Container, \
      File, ResponseError
+from nose.plugins.attrib import attr
 
 config = get_config()
 
@@ -996,6 +997,7 @@ class TestFile(Base):
         self.assertRaises(ResponseError, file.write_random)
         self.assert_status(400)
 
+    @attr('fails_on_rgw')
     def testMetadataNumberLimit(self):
         number_limit = 90
 
@@ -1092,6 +1094,7 @@ class TestFile(Base):
 
             self.assert_(file.read(hdrs={'Range': r}) == data[0:1000])
 
+    @attr('fails_on_rgw')
     def testFileSizeLimit(self):
         limit = 5*2**30 + 2
         tsecs = 3
@@ -1146,6 +1149,7 @@ class TestFile(Base):
             file_length)
         self.assert_status(200)
 
+    @attr('fails_on_rgw')
     def testMetadataLengthLimits(self):
         key_limit, value_limit = 128, 256
         lengths = [[key_limit, value_limit], [key_limit, value_limit+1], \
@@ -1228,6 +1232,7 @@ class TestFile(Base):
         self.assertRaises(ResponseError, file.info)
         self.assert_status(404)
 
+    @attr('fails_on_rgw')
     def testMetadataOnPost(self):
         file = self.env.container.file(Utils.create_name())
         file.write_random(self.env.file_size)
@@ -1285,6 +1290,7 @@ class TestFile(Base):
         self.assertRaises(ResponseError, file.sync_metadata)
         self.assert_status(404)
 
+    @attr('fails_on_rgw')
     def testMetadataOnPut(self):
         for i in range(10):
             metadata = {}
