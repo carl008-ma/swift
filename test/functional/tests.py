@@ -809,7 +809,7 @@ class TestFile(Base):
 
         metadata = {}
         for i in range(1):
-            metadata[Utils.create_name()] = Utils.create_name()
+            metadata[Utils.create_ascii_name()] = Utils.create_name()
 
         data = file.write_random()
         file.sync_metadata(metadata)
@@ -895,7 +895,7 @@ class TestFile(Base):
 
         metadata = {}
         for i in range(1):
-            metadata[Utils.create_name()] = Utils.create_name()
+            metadata[Utils.create_ascii_name()] = Utils.create_name()
         file.metadata = metadata
 
         data = file.write_random()
@@ -983,7 +983,7 @@ class TestFile(Base):
         self.assert_(file.delete())
         self.assert_status(204)
 
-        file.metadata = {Utils.create_name(): Utils.create_name()}
+        file.metadata = {Utils.create_ascii_name(): Utils.create_name()}
 
         for method in (file.info, file.read, file.sync_metadata, \
             file.delete):
@@ -1232,7 +1232,6 @@ class TestFile(Base):
         self.assertRaises(ResponseError, file.info)
         self.assert_status(404)
 
-    @attr('fails_on_rgw')
     def testMetadataOnPost(self):
         file = self.env.container.file(Utils.create_name())
         file.write_random(self.env.file_size)
@@ -1240,7 +1239,7 @@ class TestFile(Base):
         for i in range(10):
             metadata = {}
             for i in range(10):
-                metadata[Utils.create_name()] = Utils.create_name()
+                metadata[Utils.create_ascii_name()] = Utils.create_name()
 
             file.metadata = metadata
             self.assert_(file.sync_metadata())
@@ -1290,12 +1289,11 @@ class TestFile(Base):
         self.assertRaises(ResponseError, file.sync_metadata)
         self.assert_status(404)
 
-    @attr('fails_on_rgw')
     def testMetadataOnPut(self):
         for i in range(10):
             metadata = {}
             for j in range(10):
-                metadata[Utils.create_name()] = Utils.create_name()
+                metadata[Utils.create_ascii_name()] = Utils.create_name()
 
             file = self.env.container.file(Utils.create_name())
             file.metadata = metadata
