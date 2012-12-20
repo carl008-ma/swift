@@ -152,6 +152,7 @@ class TestAccount(Base):
     env = TestAccountEnv
     set_up = False
 
+    @attr('fails_on_rgw')
     def testNoAuthToken(self):
         self.assertRaises(ResponseError, self.env.account.info,
             cfg={'no_auth_token':True})
@@ -168,12 +169,14 @@ class TestAccount(Base):
         self.assert_status(412)
         self.assert_body('Invalid UTF8')
 
+    @attr('fails_on_rgw')
     def testVersionOnlyPath(self):
         self.env.account.conn.make_request('PUT',
             cfg={'version_only_path':True})
         self.assert_status(412)
         self.assert_body('Bad URL')
 
+    @attr('fails_on_rgw')
     def testInvalidPath(self):
         was_url = self.env.account.conn.storage_url
         self.env.account.conn.storage_url = "/%s" % was_url
@@ -406,6 +409,7 @@ class TestContainer(Base):
             self.assert_(cont.files(parms={'marker': f, 'prefix':f}) == [])
             self.assert_(cont.files(parms={'prefix': f}) == [f])
 
+    @attr('foo')
     def testPrefixAndLimit(self):
         cont = self.env.account.container(Utils.create_name())
         self.assert_(cont.create())
@@ -467,6 +471,7 @@ class TestContainer(Base):
             cfg={'no_path_quote':True})
         self.assert_status(412)
 
+    @attr('fails_on_rgw')
     def testCreateOnExisting(self):
         cont = self.env.account.container(Utils.create_name())
         self.assert_(cont.create())
