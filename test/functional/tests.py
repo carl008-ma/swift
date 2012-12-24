@@ -479,6 +479,7 @@ class TestContainer(Base):
         self.assert_(cont.create())
         self.assert_status(202)
 
+    @attr('fails_on_rgw')
     def testSlashInName(self):
         if Utils.create_name == Utils.create_utf8_name:
             cont_name = list(unicode(Utils.create_name(), 'utf-8'))
