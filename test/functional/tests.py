@@ -486,7 +486,7 @@ class TestContainer(Base):
         else:
             cont_name = list(Utils.create_name())
 
-        cont_name[random.randint(2, len(cont_name)-2)] = '/'
+        cont_name[random.randint(3, len(cont_name)-2)] = '/'
         cont_name = ''.join(cont_name)
 
         if Utils.create_name == Utils.create_utf8_name:
