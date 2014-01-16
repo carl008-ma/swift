@@ -32,7 +32,11 @@ virtualenv --no-site-packages --distribute virtualenv
 # avoid pip bugs
 ./virtualenv/bin/pip install --upgrade pip
 
-./virtualenv/bin/pip install -r requirements.txt
+# work-around change in pip 1.5
+./virtualenv/bin/pip install setuptools --no-use-wheel --upgrade
+
+# Netifaces in non SSL external host.
+./virtualenv/bin/pip install --allow-unverified netifaces --allow-external netifaces -r requirements.txt
 
 # forbid setuptools from using the network because it'll try to use
 # easy_install, and we really wanted pip; next line will fail if pip
