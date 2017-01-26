@@ -33,7 +33,7 @@ virtualenv --no-site-packages --distribute virtualenv
 ./virtualenv/bin/pip install --upgrade pip
 
 # work-around change in pip 1.5
-./virtualenv/bin/pip install setuptools --no-use-wheel --upgrade
+./virtualenv/bin/pip install setuptools==32.3.1
 
 # Netifaces in non SSL external host.
 ./virtualenv/bin/pip install --allow-unverified netifaces --allow-external netifaces -r requirements.txt
