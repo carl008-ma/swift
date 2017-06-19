@@ -264,10 +264,6 @@ class Connection(object):
                 parms.items()]
             path = '%s?%s' % (path, '&'.join(query_args))
 
-            query_args = ['%s=%s' % (urllib.quote(x),
-                urllib.quote(str(y))) for (x,y) in parms.items()]
-            path = '%s?%s' % (path, '&'.join(query_args))
-
         self.connection = self.conn_class(self.storage_host,
             port=self.storage_port)
         #self.connection.set_debuglevel(3)
@@ -599,7 +595,7 @@ class File(Base):
         return data
 
     def read(self, size=-1, offset=0, hdrs=None, buffer=None,
-        callback=None, cfg={}):
+        callback=None, cfg={}, parms={}):
 
         if size > 0:
             range = 'bytes=%d-%d' % (offset, (offset + size) - 1)
@@ -609,7 +605,7 @@ class File(Base):
                 hdrs = {'Range': range}
 
         status = self.conn.make_request('GET', self.path, hdrs=hdrs,
-            cfg=cfg)
+            cfg=cfg, parms=parms)
 
         if(status < 200) or (status > 299):
             raise ResponseError(self.conn.response)
@@ -730,6 +726,10 @@ class File(Base):
 
             raise ResponseError(self.conn.response)
 
+        try:
+            data.seek(0);
+        except IOError:
+            pass
         self.md5 = self.compute_md5sum(data)
 
         return True
