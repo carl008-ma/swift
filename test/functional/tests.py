@@ -16,6 +16,8 @@
 
 import array
 from datetime import datetime
+import hashlib
+import json
 import locale
 import os
 import os.path
@@ -27,6 +29,7 @@ import threading
 import uuid
 import unittest
 import urllib
+from nose import SkipTest
 
 from test import get_config
 from swift import Account, AuthenticationFailed, Connection, Container, \
@@ -809,7 +812,7 @@ class TestFile(Base):
     set_up = False
 
     def testCopy(self):
-        # makes sure to test encoded characters"
+        # makes sure to test encoded characters
         source_filename = 'dealde%2Fl04 011e%204c8df/flash.png'
         file = self.env.container.file(source_filename)
 
@@ -1426,6 +1429,99 @@ class TestFile(Base):
 class TestFileUTF8(Base2, TestFile):
     set_up = False
 
+class TestDloEnv(object):
+    @classmethod
+    def setUp(cls):
+        cls.conn = Connection(config)
+        cls.conn.authenticate()
+        cls.account = Account(cls.conn, config.get('account',
+                                                   config['username']))
+        cls.account.delete_containers()
+
+        cls.container = cls.account.container(Utils.create_name())
+
+        if not cls.container.create():
+            raise ResponseError(cls.conn.response)
+
+        # avoid getting a prefix that stops halfway through an encoded
+        # character
+        #prefix = Utils.create_name().decode("utf-8")[:10].encode("utf-8")
+        prefix = "myobj"
+        cls.segment_prefix = prefix
+
+        for letter in ('a', 'b', 'c', 'd', 'e'):
+            file_item = cls.container.file("%s/seg_lower%s" % (prefix, letter))
+            file_item.write(letter * 10)
+
+            file_item = cls.container.file("%s/seg_upper%s" % (prefix, letter))
+            file_item.write(letter.upper() * 10)
+
+        print "prefix,prefix,prefix=%s"%prefix
+        man1 = cls.container.file("man1")
+        man1.write('man1-contents',
+                   hdrs={"X-Object-Manifest": "%s/%s/seg_lower" %
+                         (cls.container.name, prefix)})
+
+        man1 = cls.container.file("man2")
+        man1.write('man2-contents',
+                   hdrs={"X-Object-Manifest": "%s/%s/seg_upper" %
+                         (cls.container.name, prefix)})
+
+        manall = cls.container.file("manall")
+        manall.write('manall-contents',
+                     hdrs={"X-Object-Manifest": "%s/%s/seg" %
+                           (cls.container.name, prefix)})
+
+
+class TestDlo(Base):
+    env = TestDloEnv
+    set_up = False
+
+    def setUp(self):
+        super(TestDlo, self).setUp()
+
+    def test_get_manifest(self):
+        file_item = self.env.container.file('man1')
+        file_contents = file_item.read()
+        self.assertEqual(
+            file_contents,
+            "aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeee")
+
+        file_item = self.env.container.file('man2')
+        file_contents = file_item.read()
+        self.assertEqual(
+            file_contents,
+            "AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDDDDDDDDDDEEEEEEEEEE")
+
+        file_item = self.env.container.file('manall')
+        file_contents = file_item.read()
+        self.assertEqual(
+            file_contents,
+            ("aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeee" +
+             "AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDDDDDDDDDDEEEEEEEEEE"))
+
+    def test_get_manifest_document_itself(self):
+        file_item = self.env.container.file('man1')
+        file_contents = file_item.read(parms={'multipart-manifest': 'get'})
+        self.assertEqual(file_contents, "man1-contents")
+
+    def test_get_range(self):
+        file_item = self.env.container.file('man1')
+        file_contents = file_item.read(size=25, offset=8)
+        self.assertEqual(file_contents, "aabbbbbbbbbbccccccccccddd")
+
+        file_contents = file_item.read(size=1, offset=47)
+        self.assertEqual(file_contents, "e")
+
+    def test_get_range_out_of_range(self):
+        file_item = self.env.container.file('man1')
+
+        self.assertRaises(ResponseError, file_item.read, size=7, offset=50)
+        self.assert_status(416)
+
+class TestDloUTF8(Base2, TestDlo):
+    set_up = False
+
 class TestFileComparisonEnv:
     @classmethod
     def setUp(cls):
@@ -1508,6 +1604,96 @@ class TestFileComparison(Base):
             self.assert_status(412)
 
 class TestFileComparisonUTF8(Base2, TestFileComparison):
+    set_up = False
+
+class TestSloEnv(object):
+    slo_enabled = None  # tri-state: None initially, then True/False
+
+    @classmethod
+    def setUp(cls):
+        cls.conn = Connection(config)
+        cls.conn.authenticate()
+        cls.account = Account(cls.conn, config.get('account',
+                                                   config['username']))
+        cls.account.delete_containers()
+
+        cls.container = cls.account.container(Utils.create_name())
+
+        if not cls.container.create():
+            raise ResponseError(cls.conn.response)
+
+        # TODO(seriously, anyone can do this): make this use the /info API once
+        # it lands, both for detection of SLO and for minimum segment size
+        if cls.slo_enabled is None:
+            cls.slo_enabled = True
+        seg_info = {}
+        for letter, size in (('a', 1024 * 1024),
+                             ('b', 1024 * 1024),
+                             ('c', 1024 * 1024),
+                             ('d', 1024 * 1024),
+                             ('e', 1)):
+            seg_name = "seg_%s" % letter
+            file_item = cls.container.file(seg_name)
+            file_item.write(letter * size)
+            seg_info[seg_name] = {
+                'size_bytes': size,
+                'etag': file_item.md5,
+                'path': '/%s/%s' % (cls.container.name, seg_name)}
+
+        file_item = cls.container.file("manifest-abcde")
+        file_item.write(
+            json.dumps([seg_info['seg_a'], seg_info['seg_b'],
+                        seg_info['seg_c'], seg_info['seg_d'],
+                        seg_info['seg_e']]),
+            parms={'multipart-manifest': 'put'})
+
+
+class TestSlo(Base):
+    env = TestSloEnv
+    set_up = False
+
+    def setUp(self):
+        super(TestSlo, self).setUp()
+        if self.env.slo_enabled is False:
+            raise SkipTest("SLO not enabled")
+        elif self.env.slo_enabled is not True:
+            # just some sanity checking
+            raise Exception(
+                "Expected slo_enabled to be True/False, got %r" %
+                (self.env.slo_enabled,))
+
+    def test_slo_get_simple_manifest(self):
+        file_item = self.env.container.file('manifest-abcde')
+        file_contents = file_item.read()
+        self.assertEqual(4 * 1024 * 1024 + 1, len(file_contents))
+        self.assertEqual('a', file_contents[0])
+        self.assertEqual('a', file_contents[1024 * 1024 - 1])
+        self.assertEqual('b', file_contents[1024 * 1024])
+        self.assertEqual('d', file_contents[-2])
+        self.assertEqual('e', file_contents[-1])
+
+    def test_slo_ranged_get(self):
+        file_item = self.env.container.file('manifest-abcde')
+        file_contents = file_item.read(size=1024 * 1024 + 2,
+                                       offset=1024 * 1024 - 1)
+        self.assertEqual('a', file_contents[0])
+        self.assertEqual('b', file_contents[1])
+        self.assertEqual('b', file_contents[-2])
+        self.assertEqual('c', file_contents[-1])
+
+    def test_slo_etag_is_hash_of_etags(self):
+        expected_hash = hashlib.md5()
+        expected_hash.update(hashlib.md5('a' * 1024 * 1024).hexdigest())
+        expected_hash.update(hashlib.md5('b' * 1024 * 1024).hexdigest())
+        expected_hash.update(hashlib.md5('c' * 1024 * 1024).hexdigest())
+        expected_hash.update(hashlib.md5('d' * 1024 * 1024).hexdigest())
+        expected_hash.update(hashlib.md5('e').hexdigest())
+        expected_etag = expected_hash.hexdigest()
+
+        file_item = self.env.container.file('manifest-abcde')
+        self.assertEqual(expected_etag, file_item.info()['etag'])
+
+class TestSloUTF8(Base2, TestSlo):
     set_up = False
 
 if __name__ == '__main__':
