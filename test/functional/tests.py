@@ -445,6 +445,72 @@ class TestContainer(Base):
                 for file in files:
                     self.assert_(file.startswith(prefix))
 
+    # Non-standard behavior, not part of swift
+    @attr('fails_on_swift')
+    def testUnorderedList(self):
+        cont = self.env.account.container(Utils.create_name())
+        self.assert_(cont.create())
+
+        prefix_file_count = 10
+        limit_count = 7
+        prefixs = ['alpha/', 'beta/', 'kappa/']
+        prefix_files = {}
+
+        all_files = []
+        for prefix in prefixs:
+            prefix_files[prefix] = []
+
+            for i in range(prefix_file_count):
+                file = cont.file(prefix + Utils.create_name())
+                file.write()
+                prefix_files[prefix].append(file.name)
+                all_files.append(file.name)
+
+        all_files.sort()
+
+        # test normal
+        for format in [None, 'json', 'xml']:
+            files = cont.files(parms={'allow_unordered':'true'})
+            self.assertEquals(sorted(files), sorted(all_files))
+
+        # test prefixes
+        for format in [None, 'json', 'xml']:
+            for prefix in prefixs:
+                files = cont.files(parms={'prefix':prefix,
+                                          'allow_unordered':'true'})
+                self.assertEquals(sorted(files), sorted(prefix_files[prefix]))
+                for file in files:
+                    self.assert_(file.startswith(prefix))
+
+        # test prefixes with limit
+        for format in [None, 'json', 'xml']:
+            for prefix in prefixs:
+                files = cont.files(parms={'limit':limit_count,
+                                          'prefix':prefix,
+                                          'allow_unordered':'true'})
+                self.assertEquals(len(files), limit_count)
+                for file in files:
+                    self.assert_(file.startswith(prefix))
+
+        # test marker and end_marker; compare against ordered
+        for format in [None, 'json', 'xml']:
+            marker = all_files[len(all_files) / 4]
+            end_marker = all_files[3 * len(all_files) / 4]
+            files = cont.files(parms={'allow_unordered':'true',
+                                      'marker':marker,
+                                      'end_marker':end_marker})
+            files2 = cont.files(parms={'marker':marker,
+                                       'end_marker':end_marker})
+            self.assertEquals(sorted(files), sorted(files2))
+
+        # test error produced when combining unordered and delimiter
+        for format in [None, 'json', 'xml']:
+            self.assertRaises(ResponseError,
+                              cont.files,
+                              parms={'allow_unordered':'true',
+                                     'delimiter':'/'})
+            self.assert_status(400)
+
     def testCreate(self):
         cont = self.env.account.container(Utils.create_name())
         self.assert_(cont.create())
