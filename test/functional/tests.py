@@ -165,6 +165,7 @@ class TestAccount(Base):
             cfg={'no_auth_token':True})
         self.assert_status([401, 412])
 
+    @attr('fails_on_rgw') # https://bugs.python.org/issue30458
     def testInvalidUTF8Path(self):
         invalid_utf8 = Utils.create_utf8_name()[::-1]
         container = self.env.account.container(invalid_utf8)
@@ -524,6 +525,7 @@ class TestContainer(Base):
                 parms={'format':format})
             self.assert_status(404)
 
+    @attr('fails_on_rgw') # https://bugs.python.org/issue30458
     def testUtf8Container(self):
         valid_utf8 = Utils.create_utf8_name()
         invalid_utf8 = valid_utf8[::-1]
@@ -1037,6 +1039,7 @@ class TestFile(Base):
                 self.assertRaises(ResponseError, file.write)
                 self.assert_status(400)
 
+    @attr('fails_on_rgw') # https://bugs.python.org/issue30458
     def testQuestionMarkInName(self):
         if Utils.create_name == Utils.create_ascii_name:
             file_name = list(Utils.create_name())
