@@ -1667,10 +1667,11 @@ class TestFileComparison(Base):
             self.assertRaises(ResponseError, file.read, hdrs=hdrs)
             self.assert_status(412)
 
+
+            #ignore if-unmodified-since when if-match exists according to https://tools.ietf.org/html/rfc7232#page-18
             hdrs = {'If-Match': file.md5, 'If-Unmodified-Since': \
                 self.env.time_old}
-            self.assertRaises(ResponseError, file.read, hdrs=hdrs)
-            self.assert_status(412)
+            self.assert_(file.read(hdrs=hdrs))
 
 class TestFileComparisonUTF8(Base2, TestFileComparison):
     set_up = False
